@@ -7,7 +7,7 @@ from .functional import focal_loss_with_logits
 
 __all__ = ["BinaryFocalLoss", "FocalLoss"]
 
-def showVar(v, name):
+def showTensor(v, name):
     print(name + " shape:{0} range:[{1}, {2}]".format(v.shape, torch.min(v), torch.max(v)))
 
 class BinaryFocalLoss(_Loss):
@@ -52,7 +52,8 @@ class BinaryFocalLoss(_Loss):
 
 class FocalLoss(_Loss):
     def __init__(
-        self, alpha=None, gamma=2, ignore_index=None, reduction="mean", normalized=False, reduced_threshold=None, verbose=0
+        self, alpha=None, gamma=2, ignore_index=None, reduction="mean", normalized=False, reduced_threshold=None,
+        cls_dim=1, verbose=0
     ):
         """
         Focal loss for multi-class problem.
@@ -64,6 +65,7 @@ class FocalLoss(_Loss):
         """
         super().__init__()
         self.ignore_index = ignore_index
+        self.cls_dim = cls_dim
         self.verbose = verbose
         self.focal_loss_fn = partial(
             focal_loss_with_logits,
@@ -75,7 +77,7 @@ class FocalLoss(_Loss):
         )
 
     def forward(self, label_input, label_target):
-        num_classes = label_input.size(2)
+        num_classes = label_input.size(self.cls_dim)
         loss = 0
 
         if self.verbose > 0:
@@ -86,8 +88,8 @@ class FocalLoss(_Loss):
             not_ignored = label_target != self.ignore_index
 
         for cls in range(num_classes):
-            cls_label_target = label_target[:, :, cls]
-            cls_label_input = label_input[:, :, cls]
+            cls_label_target = label_target.select(dim=self.cls_dim, index=cls)
+            cls_label_input = label_input.select(dim=self.cls_dim, index=cls)
 
             if self.ignore_index is not None:
                 cls_label_target = cls_label_target[not_ignored]
@@ -95,8 +97,8 @@ class FocalLoss(_Loss):
 
             if self.verbose > 0:
                 print("cls: {0}".format(cls))
-                showVar(cls_label_target, "cls_label_target")
-                showVar(cls_label_input, "cls_label_input")
+                showTensor(cls_label_target, "cls_label_target")
+                showTensor(cls_label_input, "cls_label_input")
 
             loss += self.focal_loss_fn(cls_label_input, cls_label_target)
         return loss
